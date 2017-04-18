@@ -1,13 +1,16 @@
 # objc_class_dump
+
+
+
 A object-c class dumper written in Python
 
-The famous object-c class-dump(https://github.com/nygard/class-dump) is not very handy when doing some assembler language level IOS application ananlysis.
+The famous object-c class-dump (https://github.com/nygard/class-dump) is not very handy when doing some assembler language level IOS application ananlysis.
 
 So I developed an objc_class_dump with Python from scrath.
 
 This tool not only dumps the hierarchy of all object-c classes but also dumps raw information of some other sections.
 
-This tool was developed with Python 2.7 and tested with Mach-O file with arm and aarch64 architecture.
+It was developed with Python 2.7 and tested with Mach-O file with arm and aarch64 architecture.
 
 How it works:
 
@@ -26,10 +29,11 @@ How it works:
 7. Build hierarchy of object-c class list and non-lazy class list
 
 How to use:
-python objc_class_dump.py [options] <mach-o-file>
+
+    $ python objc_class_dump.py [options] <mach-o-file>
 
 # TODO:
 ---
-> dump __objc_protolist
-> Documentation
+> - dump __objc_protolist
+> - Documentation
 
