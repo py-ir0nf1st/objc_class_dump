@@ -27,7 +27,7 @@ class MACH_O_LOAD_COMMAND_TYPE(Enum):
     TWOLEVEL_HINTS = 0x16   #Two-level namespace lookup hints.
     PREBIND_CKSUM = 0x17    #Prebind checksum.
     #Load a dynamically linked shared library that is allowed to be missing (weak).
-    WEAK_DYLIB = 0x18
+    WEAK_DYLIB = 0x80000018
     SEGMENT_64 = 0x19       #64-bit segment of this file to be mapped.
     ROUTINES_64 = 0x1a      #Address of the dyld init routine in a dylib.
     UUID = 0x1b             #128-bit UUID of the executable.
