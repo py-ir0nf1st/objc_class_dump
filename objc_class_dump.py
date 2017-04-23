@@ -46,25 +46,32 @@ class MachOAnalyzer:
 
         #pass1: build the import table
         if dyld_info.bind_size != 0:
+            #print 'bind pass1'
             self.__build_bind_info(dyld_info.bind_off, dyld_info.bind_size, self.__bind_pass1)
 
         if dyld_info.weak_bind_size != 0:
+            #print 'weak bind pass1'
             self.__build_bind_info(dyld_info.weak_bind_off, dyld_info.weak_bind_size, self.__bind_pass1)
 
         if dyld_info.lazy_bind_size != 0:
+            #print 'lazy bind pass1'
             self.__build_bind_info(dyld_info.lazy_bind_off, dyld_info.lazy_bind_size, self.__bind_pass1)
 
         #build virtual section from the import table
+        #TODO revise the data structure for addend
         self.__virtual_section = self.__build_virtual_section()
 
         #pass2: bind address to virtual section
         if dyld_info.bind_size != 0:
+            #print 'bind pass2'
             self.__build_bind_info(dyld_info.bind_off, dyld_info.bind_size, self.__bind_pass2)
 
         if dyld_info.weak_bind_size != 0:
+            #print 'weak bind pass2'
             self.__build_bind_info(dyld_info.weak_bind_off, dyld_info.weak_bind_size, self.__bind_pass2)
 
         if dyld_info.lazy_bind_size != 0:
+            #print 'lazy bind pass2'
             self.__build_bind_info(dyld_info.lazy_bind_off, dyld_info.lazy_bind_size, self.__bind_pass2)
 
         self.__objc2_cls_stack = []
@@ -203,7 +210,8 @@ class MachOAnalyzer:
         dylib_cmd_count = 0
         for i in range(n_cmds):
             type, lc_len = struct.unpack(self.__endian_str + 'LL', self.__fd.read(8))
-            if MACH_O_LOAD_COMMAND_TYPE(type) == MACH_O_LOAD_COMMAND_TYPE.LOAD_DYLIB:
+            if (MACH_O_LOAD_COMMAND_TYPE(type) == MACH_O_LOAD_COMMAND_TYPE.LOAD_DYLIB) or \
+                (MACH_O_LOAD_COMMAND_TYPE(type) == MACH_O_LOAD_COMMAND_TYPE.WEAK_DYLIB):
                 off, ts, cur_ver, compat_ver = struct.unpack(self.__endian_str + 'LLLL', self.__fd.read(16))
 
                 c_str = ''
@@ -274,7 +282,7 @@ class MachOAnalyzer:
     #Load binding information and build up a binding table which is a list of vmaddr to imported symbol mapping
     #This is a simple implementation
     #Many Object-C data structure are fixed up based on binding information. The binding table must be loaded before analyzing and dumping Object-C data.
-    def __build_bind_info(self, bind_off, bind_size, bind_function):        
+    def __build_bind_info(self, bind_off, bind_size, bind_function):
         self.__fd.seek(self.__mh_offset + bind_off)
         bind_data = self.__fd.read(bind_size)
         library = None
@@ -282,12 +290,13 @@ class MachOAnalyzer:
         bind_list = []
 
         i = 0
-        lib_ordinal = None
+        #Deal with bind command without set dylib ordinal
+        lib_ordinal = 1
         value = None
         len = None
         symbol = None
         type = None
-        addend = None
+        addend = 0
         seg_idx = None
         seg_off = None
         addr = None
@@ -305,6 +314,8 @@ class MachOAnalyzer:
 
                 debug_str = debug_str + 'bind done'
                 #print debug_str
+
+                return
                 
             elif opcode == DYLD_INFO_BIND_OPCODE.SET_DYLIB_ORDINAL_IMM:
                 lib_ordinal = imm
@@ -352,13 +363,15 @@ class MachOAnalyzer:
                     raise UnsupportBindOpcode(byte)
                 
             elif opcode == DYLD_INFO_BIND_OPCODE.SET_ADDEND_SLEB:
+                #TODO: Add support for non zero addend
+                #The virtual section data structure need to be revised
                 addend, len = leb128.decode_sleb128(bind_data[i:bind_size:], bind_size - i)
                 i = i + len
 
                 debug_str = debug_str + 'set addend sleb: 0x{:x}'.format(addend)
                 #print debug_str
 
-                raise UnsupportBindOpcode(byte)
+                #raise UnsupportBindOpcode(byte)
                 
             elif opcode == DYLD_INFO_BIND_OPCODE.SET_SEGMENT_AND_OFFSET_ULEB:
                 seg_idx = imm
@@ -432,6 +445,9 @@ class MachOAnalyzer:
                 #print debug_str
             else:
                 raise UnsupportBindOpcode(byte)
+        #bind commands without end
+        print 'bind commands without end'
+        return
 
     #Search for segment  LOAD_COMMAND_SEGMENT or LOAD_COMMAND_SEGMENT64 with segment index
     #Generally __ZEROPAGE is indexed by 0, __TEXT by 1, __DATA by 2 and __LINKEDIT by 3
@@ -462,9 +478,10 @@ class MachOAnalyzer:
             length = 4
             addr_str = struct.pack(self.__endian_str + 'L', symbol_addr)
 
+        #TODO: addend
         data = section.data[0 : position] + addr_str + section.data[position + length:]
         section.data = data
-        #print '0x{:X} binding to 0x{:X}:{:s}'.format(segment.vmaddr + seg_off, symbol_addr, symbol)
+        #print '0x{:X} binding to 0x{:X}:{:s}+{:d}'.format(segment.vmaddr + seg_off, symbol_addr, symbol, addend)
 
     def dump_import_table(self):
         for dylib in self.__dylibs:
@@ -1126,6 +1143,7 @@ def main():
         mach_o_anylyzer = MachOAnalyzer(fd, arch)
     except UnknownMagic as e:
         print 'Unknow magic:' + e.value
+        fd.close()
         sys.exit(0)
 
     if options.dump_clslist:
